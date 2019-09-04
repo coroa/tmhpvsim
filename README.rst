@@ -12,17 +12,28 @@ is handled by ``pipenv``.```
 pipenv install --deploy
 ```
 
-A [RabbitMQ](https://rabbitmq.com/) server -- to be used as broker -- is expected to run at AMQP_URL (defaulting to ```localhost:?```).
+A [RabbitMQ](https://rabbitmq.com/) server -- to be used as broker -- is expected to run at AMQP_URL (defaulting to ```localhost:5672```).
 
 metersim
 --------
 
-``metersim`` connects to the broker and publishes the current demand (drawn from a Uniform distribution $\mathcal U([0, 60])$) and maybe a timestamp?
+``metersim`` connects to the broker and publishes the current demand (drawn from a Uniform distribution $\mathcal U([0, 9000])$) and a timestamp.
 
 Usage
 ~~~~~
 
-``metersim`` is available as an entrypoint. Run with ``metersim``.
+.. code ::
+
+    Usage: metersim [OPTIONS]
+
+    Options:
+      --amqp-url TEXT     AMQP URL (defaults to 'amqp://localhost:5672/')
+      --exchange TEXT     The name of the exchange (defaults to 'meter')
+      --routing-key TEXT  The routing key (defaults to 'meter')
+      --log INTEGER       logging level (1=DEBUG, 2=INFO, 3=WARN (default),
+                          4=ERROR)
+      --help              Show this message and exit.
+
 
 pvsim
 -----

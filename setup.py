@@ -1,7 +1,7 @@
 import setuptools
 import versioneer
 
-with open("README.md", "r") as fh:
+with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
@@ -15,19 +15,25 @@ setuptools.setup(
     long_description_content_type='text/x-rst',
     url="https://github.com/coroa/tmhpvsim",
     packages=setuptools.find_packages(exclude=['docs', 'test']),
+    entry_points={
+        'console_scripts': [
+            'metersim = tmhpvsim.metersim:metersim',
+        ]
+    },
     include_package_data=True,
     install_requires=[
-        pvlib,
-        tables,
-        matplotlib,
-        xarray,
-        netcdf4,
-        pymc3,
-        siphon,
-        pika,
-        arviz,
-        seaborn,
-        cdsapi
+        "click",
+        "pvlib",
+        "tables",
+        "matplotlib",
+        "xarray",
+        "netcdf4",
+        "pymc3",
+        "siphon",
+        "aio_pika",
+        "arviz",
+        "seaborn",
+        "cdsapi"
     ],
     license='MIT',
     classifiers=[

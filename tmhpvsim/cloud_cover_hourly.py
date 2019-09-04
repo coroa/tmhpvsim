@@ -5,7 +5,7 @@ cover in time i then
 
 .. code:: python
 
-    x[i+1] = np.clip(x[i] + draw_random_step(x[i]), 0, 1)
+  x[i+1] = np.clip(x[i] + draw_random_step(x[i]), 0, 1)
 
 where `draw_random_step` draws from one of 6 different distributions, depending
 on the bin it falls into from (-1e-4, 0.1], (0.1, 0.3], (0.3, 0.7], (0.7, 0.9],
@@ -241,8 +241,8 @@ def get_distributions(
     distribution_plots_file=Path("img") / "distributions.png"
 ):
 
-    if shape_parameter_file.exists():
-        shapes = pd.read_csv(shape_parameter_file, index_col=[0, 1])
+    if shape_parameters_file.exists():
+        shapes = pd.read_csv(shape_parameters_file, index_col=[0, 1])
         shapes.index = pd.IntervalIndex.from_tuples(shapes.index)
     else:
         total_cloud_cover = Path.cwd() / ".." / "munich_tcc.nc"
@@ -264,7 +264,35 @@ def get_distributions(
         plot_distribution_and_hist(shapes, steps, distribution_plots_file)
 
         (shapes.set_index(pd.MultiIndex.from_tuples(shapes.index.to_tuples()))
-               .to_csv(shape_parameter_file))
+               .to_csv(shape_parameters_file))
 
     shapes = shapes.rename(columns={'nu': 'df'})
     distributions = get_distributions_from_shapes(shapes)
+
+def get_cloud_cover(distributions, initial_state=1.):
+    """Generator of hourly cloud cover values in [0., 1.]
+
+    Return a generator for cloud cover values from the Markov Chain induced by
+    `distributions` starting in `state`
+
+    Parameters
+    ----------
+    distributions : pd.Series
+        Maps `Interval`s to frozen scipy.stats random distributions
+    intial_state : float, optional
+        Initial state (defaults to 1.)
+
+    Returns
+    -------
+    Generator[float]
+        Generator of hourly cloud cover states
+
+    """
+    bins = np.asarray(distributions.index.map(lambda i: i.right))
+    distributions = np.asarray(distributions)
+    state = np.clip(initial_state, 0., 1.)
+
+    while True:
+        dist = distributions[np.searchsorted(bins, state)]
+        state = np.clip(state + dist.rvs(), 0., 1.)
+        yield state

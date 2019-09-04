@@ -1,0 +1,28 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pvlib = "*"
+tables = "*"
+matplotlib = "*"
+netcdf4 = "*"
+siphon = "*"
+pika = "*"
+xarray = "*"
+pymc3 = "*"
+arviz = "*"
+seaborn = "*"
+cdsapi = "*"
+
+[dev-packages]
+pytest = "*"
+tox = "*"
+ipython = "*"
+ipykernel = "*"
+pylint = "*"
+flake8 = "*"
+
+[requires]
+python_version = "3.7"

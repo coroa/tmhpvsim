@@ -1,2 +1,3 @@
 include versioneer.py
 include tmhpvsim/_version.py
+include tmhpvsim/data/*.csv

@@ -1,4 +1,6 @@
 import numpy as np
+import logging
+logger = logging.getLogger(__name__)
 
 def random_windspeed(size=None):
     """Draw a random value for the current windspeed
@@ -65,31 +67,35 @@ class CloudCoverBinary:
         # Start somewhere within the first cloud
         self.sec = int((self.cloud_length + self.clear_length) * np.random.random())
 
-    def update_parameters(hourly_cloudcover, windspeed=None):
-        self.hourly_cloudcover = hourly_cloudcover
+    def update_parameters(self, hourly_cloudcover, windspeed=None):
+        self.hourly_cloudcover = min(hourly_cloudcover, 0.95)
         if windspeed is None:
-            self.windspeed = get_random_windspeed()
+            windspeed = get_random_windspeed()
+        self.windspeed = windspeed
 
     def reset_sigma(self):
-        self.sigma_cloud = np.cumsum(5 * 60 * np.ones(int(r*12)))
+        self.sigma_cloud = np.cumsum(5 * 60 * np.ones(int(self.hourly_cloudcover*12)))
         self.sigma_clear = (1/self.hourly_cloudcover - 1) * self.sigma_cloud
 
-    def next_cloud(self):
-        for i in range(10):
+    def next_cloud(self, recurse=False):
+        for i in range(20):
             cloud_length = random_cloudlength_in_s(self.windspeed)
             next_sigma_cloud = cloud_length + self.sigma_cloud
             next_sigma_clear = (1/self.hourly_cloudcover - 1) * next_sigma_cloud
 
             tot_length = next_sigma_cloud + next_sigma_clear
-            possible = (next_sigma_clear - self.sigma_clear > 0) & (tot_length < 70 * 60)
+            possible = (next_sigma_clear - self.sigma_clear > 0) & (tot_length < 90 * 60)
             if possible.any():
                 break
         else:
+            assert not recurse
+
             # Re-initialise sigma_cloud and sigma_clear (should never be reached)
-            logger.error("10 random cloudlengths rejected. Re-initialise "
+            logger.error(f"20 random cloudlengths rejected at windspeed {self.windspeed} "
+                         f"and cloudcover {self.hourly_cloudcover}. Re-initialise "
                          "sigma_cloud, sigma_clear. Then re-run.")
             self.reset_sigma()
-            return self.next_cloud()
+            return self.next_cloud(recurse=True)
 
         last = np.nonzero(possible)[0][abs(tot_length[possible] - 60 * 60).argmin()]
         self.cloud_length = cloud_length

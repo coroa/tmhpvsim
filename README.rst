@@ -6,13 +6,23 @@ As a simple PV simulation test case, we provide two separate shell utilities, wh
 
 Installation
 ------------
-is handled by ``pipenv`` (which does not seem to be the ideal choice).
+Can be handled by ``pipenv`` which takes care of installing the exact same versions, I tested the application with
 
 .. code:: shell
 
     git clone https://github.com/coroa/tmhpvsim.git
     cd tmhpvsim
     pipenv install --deploy
+    pipenv shell
+
+But, instead, I would suggest to install manually with pip into a new venv:
+
+.. code:: shell
+
+    python3 -m venv tmhpvsim
+    source tmhpvsim/bin/activate
+    pip install https://github.com/coroa/tmhpvsim.git#egg=tmhpvsim
+
 
 A `RabbitMQ <https://rabbitmq.com/>`_ server -- to be used as broker -- is expected to run at ``AMQP_URL`` (defaulting to ``localhost:5672``).
 

@@ -12,16 +12,33 @@ import logging
 logger = logging.getLogger(__name__)
 
 from .utils import fixedclock, SynchronizingFunnel
+from .pvmodel import PVModel
 
+# Definition of the fundamental namedtuple which is synced per time-stamp
+# in the SynchronizingFunnel and then passed through its out-ward queue
 Data = namedtuple("Data", ['meter', 'pv'], defaults=[np.nan, np.nan])
 
-async def write_file_from_queue(filename, queue):
-    with open(filename, mode='w', newline='', buffering=1) as file:
-        writer = csv.writer(file)
-        writer.writerow(['time'] + list(Data._fields) + ['residual load'])
-        while True:
-            time, data = await queue.get()
-            writer.writerow([time] + list(data) + [data.meter - data.pv])
+async def read_pv_values(funnel, realtime):
+    """Feeds a fixed rate stream of simulated pv values to `funnel`
+
+    Parameters
+    ----------
+    funnel : SynchronizingFunnel
+
+    realtime : bool
+        If false, fixedclock does not wait to sync up with realtime
+
+    See also
+    --------
+    SynchronizingFunnel
+
+    """
+
+    pvmodel = PVModel()
+
+    async for time in fixedclock(rate=1, realtime=realtime):
+        time_sec = datetime.datetime(*time.timetuple()[:6])
+        await funnel.put(time_sec, pv=pvmodel.next(time_sec))
 
 async def read_amqp(funnel, url, exchange, loop):
     """Connect to AMQP and receive meter values to put into `meter_queue`
@@ -51,11 +68,19 @@ async def read_amqp(funnel, url, exchange, loop):
                     time = datetime.datetime(*message.timestamp[:6])
                     await funnel.put(time, meter=meter_value)
 
-async def read_pv_values(funnel, realtime):
-    async for time in fixedclock(rate=1, realtime=realtime):
-        time_sec = datetime.datetime(*time.timetuple()[:6])
-        await funnel.put(time_sec, pv=1000 * np.random.random())
-        
+async def write_file_from_queue(filename, queue):
+    """Receives Data tuples from `queue` and writes them to `filename` as CSV
+
+    Adds timestamp and computed residual load.
+
+    """
+    with open(filename, mode='w', newline='', buffering=1) as file:
+        writer = csv.writer(file)
+        writer.writerow(['time'] + list(Data._fields) + ['residual load'])
+        while True:
+            time, data = await queue.get()
+            writer.writerow([time] + list(data) + [data.meter - data.pv])
+
 @click.command()
 @click.argument('file')
 @click.option('--amqp-url', default=os.environ.get("AMQP_URL"),
@@ -74,6 +99,7 @@ def pvsim(file, amqp_url, exchange, verbose, realtime):
 
     data_queue = asyncio.Queue(loop=loop)
     funnel = SynchronizingFunnel(Data, data_queue)
+
     loop.create_task(read_pv_values(funnel, realtime))
     loop.create_task(read_amqp(funnel, amqp_url, exchange, loop))
     loop.create_task(write_file_from_queue(file, data_queue))

@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "59abfca40519f758895bc2f5aa1564883411da6dbef99638e50d37c8fe1aa527"
+            "sha256": "5f43abacbb9b95fe3d5e0aebb65c6a35950567c6b0b7deffd0480b1df3eabe2b"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -505,9 +505,6 @@
         },
         "tmhpvsim": {
             "editable": true,
-            "extras": [
-                "d"
-            ],
             "path": "."
         },
         "tqdm": {

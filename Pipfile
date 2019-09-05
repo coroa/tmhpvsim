@@ -16,7 +16,7 @@ seaborn = "*"
 cdsapi = "*"
 aio-pika = "*"
 click = "*"
-tmhpvsim = {path = ".",extras = ["d"],editable = true}
+tmhpvsim = {path = ".", editable = true}
 
 [dev-packages]
 pytest = "*"

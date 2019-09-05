@@ -17,6 +17,7 @@ setuptools.setup(
     packages=setuptools.find_packages(exclude=['docs', 'test']),
     entry_points={
         'console_scripts': [
+            'pvsim = tmhpvsim.pvsim:pvsim',
             'metersim = tmhpvsim.metersim:metersim',
         ]
     },

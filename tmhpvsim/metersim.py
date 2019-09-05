@@ -65,7 +65,8 @@ async def read_meter_values(meter_queue, realtime):
               help="AMQP URL (defaults to 'amqp://localhost:5672/')")
 @click.option('--exchange', default=os.environ.get("TMHPVSIM_EXCHANGE", 'meter'),
               help="The name of the exchange (defaults to 'meter')")
-@click.option('-v', '--verbose', count=True)
+@click.option('-v', '--verbose', count=True,
+              help="Increase logging level from default WARN")
 @click.option('--realtime/--no-realtime', default=True,
               help="Switch off rate limiting (for simulation)")
 def metersim(amqp_url, exchange, verbose, realtime):

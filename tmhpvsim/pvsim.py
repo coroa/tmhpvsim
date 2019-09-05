@@ -55,14 +55,15 @@ async def read_pv_values(funnel, realtime):
     async for time in fixedclock(rate=1, realtime=realtime):
         time_sec = datetime.datetime(*time.timetuple()[:6])
         await funnel.put(time_sec, pv=1000 * np.random.random())
-
+        
 @click.command()
-@click.argument('file', default="log.csv")
+@click.argument('file')
 @click.option('--amqp-url', default=os.environ.get("AMQP_URL"),
               help="AMQP URL (defaults to 'amqp://localhost:5672/')")
 @click.option('--exchange', default=os.environ.get("TMHPVSIM_EXCHANGE", 'meter'),
               help="The name of the exchange (defaults to 'meter')")
-@click.option('-v', '--verbose', count=True)
+@click.option('-v', '--verbose', count=True,
+              help="Increase logging level from default WARN")
 @click.option('--realtime/--no-realtime', default=True,
               help="Switch off rate limiting (for simulation)")
 def pvsim(file, amqp_url, exchange, verbose, realtime):

@@ -20,7 +20,6 @@ investigation.
 .. image:: img/distributions.png
 """
 
-# %% importing modules
 from pathlib import Path
 import pvlib
 import pymc3 as pm
@@ -28,7 +27,6 @@ import theano.tensor as tt
 import pandas as pd
 import xarray as xr
 import numpy as np
-%matplotlib inline
 import matplotlib.pyplot as plt
 import seaborn as sn
 import cdsapi
@@ -36,9 +34,9 @@ import scipy.stats
 
 import logging
 logger = logging.getLogger(__name__)
-logging.getLogger(pm.__name__).setLevel(logging.WARN)
 
-# %% defining functions
+# Suppress logging of pymc3 (which is very noisy)
+logging.getLogger(pm.__name__).setLevel(logging.WARN)
 
 def get_total_cloud_cover(lon, lat, path=None):
     """
@@ -91,9 +89,6 @@ def get_total_cloud_cover(lon, lat, path=None):
         )
 
     return xr.open_dataset(path).isel(longitude=0, latitude=1).tcc.to_pandas()
-
-
-# %% define new asymmetric_laplace distribution
 
 class _asymmetric_laplace(scipy.stats.rv_continuous):
     """An asymmetric laplace distributed variable """
@@ -193,11 +188,28 @@ def infer_distributions(tcc, create_plots=True, **sample_kwargs):
 
     shapes = pd.DataFrame(shapes, index=groups).assign(dist=dists)
     if create_plots:
-        plot_distributions_and_hist(shapes, steps)
+        plot_file = create_plots if create_plots is not True else None
+        plot_distributions(shapes, steps, plot_file)
 
     return shapes
 
-def plot_distribution_and_hist(shapes, steps=None, file=None):
+def plot_distributions(shapes, steps=None, file=None):
+    """
+    Create a tiled plot comparing pdf of distributions with histograms of steps
+
+    Parameters
+    ----------
+    shapes : pd.DataFrame
+        For each interval a distribution defined by mark and shape parameters
+    steps : pd.Series
+        Maps interval to step samples from ERA-5
+    file : str, optional
+        If given, saves figure into file
+
+    Returns
+    -------
+    fig : plt.Figure
+    """
     distributions = get_distributions_from_shapes(shapes)
 
     fig, axes = plt.subplots(2, 3, figsize=(12, 8), constrained_layout=True)
@@ -208,7 +220,8 @@ def plot_distribution_and_hist(shapes, steps=None, file=None):
     for group in distributions.index:
         ax = next(axiter)
         distribution = distributions.loc[group]
-        params_label = ",\n     ".join(f"{k}={v:.4f}" for k,v in distribution.kwds.items())
+        params_label = ",\n     ".join(f"{k}={v:.4f}"
+                                       for k,v in distribution.kwds.items())
         dist_label = f"{shapes.loc[group, 'dist'].upper()} ({params_label})"
 
         ax.plot(x, distribution.pdf(x), label=dist_label)
@@ -258,7 +271,9 @@ def get_distributions(
                  .apply(lambda s: pd.Series.reset_index(s, drop=True))
                  .dropna())
         groups = pd.IntervalIndex(steps.index.levels[-1])
-        shapes = infer_distributions(groups, steps, tcc, draws=8000, tune=8000)
+        shapes = infer_distributions(groups, steps, tcc,
+                                     create_plots=distribution_plots_file,
+                                     draws=8000, tune=8000)
 
         distribution_plots_file = None
         plot_distribution_and_hist(shapes, steps, distribution_plots_file)

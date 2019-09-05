@@ -20,8 +20,8 @@ investigation.
 .. image:: img/distributions.png
 """
 
+from pkg_resources import resource_stream
 from pathlib import Path
-import pvlib
 import pymc3 as pm
 import theano.tensor as tt
 import pandas as pd
@@ -235,6 +235,37 @@ def plot_distributions(shapes, steps=None, file=None):
 
     return fig
 
+def determine_shape_parameters(
+    shape_parameters_file="shapes.csv",
+    total_cloud_cover_file="tcc.nc",
+    distribution_plots_file="distributions.png"
+):
+
+    lon, lat = 11.60, 48.12
+
+    tcc = get_total_cloud_cover(lon, lat, total_cloud_cover)
+
+    # Split into manually determined bins and compute differences (steps) taken
+    # from there
+    group_labels = pd.cut(tcc, bins=[-2e-4, -1.0, -1.2, -1.6, -1.8, -1.98, 0.])
+    steps = ((tcc.shift(-2) - tcc)
+              .groupby(group_labels)
+              .apply(lambda s: pd.Series.reset_index(s, drop=True))
+              .dropna())
+    groups = pd.IntervalIndex(steps.index.levels[-1])
+    shapes = infer_distributions(groups, steps, tcc,
+                                  create_plots=distribution_plots_file,
+                                  draws=8000, tune=8000)
+
+    distribution_plots_file = None
+    plot_distribution_and_hist(shapes, steps, distribution_plots_file)
+
+    if shape_parameters_file is not None:
+        (shapes.set_index(pd.MultiIndex.from_tuples(shapes.index.to_tuples()))
+                .to_csv(shape_parameters_file))
+
+    return shapes
+
 def get_fixed_distribution(dist, **params):
     try:
         return {'al': asymmetric_laplace, 't': scipy.stats.t}[dist](**params)
@@ -248,41 +279,13 @@ def get_distributions_from_shapes(shapes):
     return pd.Series([get_fixed_distribution(**v.dropna())
                       for (i,v) in shapes.iterrows()], shapes.index)
 
-def get_distributions(
-    shape_parameters_file=Path("shapes.csv"),
-    total_cloud_cover_file=Path("tcc.nc"),
-    distribution_plots_file=Path("img") / "distributions.png"
-):
+def get_distributions_from_shapes_file(dist_shapes_file=None):
+    if dist_shapes_file is None:
+        dist_shapes_file = resource_stream(__name__, "data/mc_dist_shapes.csv")
 
-    if shape_parameters_file.exists():
-        shapes = pd.read_csv(shape_parameters_file, index_col=[0, 1])
-        shapes.index = pd.IntervalIndex.from_tuples(shapes.index)
-    else:
-        total_cloud_cover = Path.cwd() / ".." / "munich_tcc.nc"
-        lat, lon = 48.12, 11.60
-
-        tcc = get_total_cloud_cover(lon, lat, total_cloud_cover)
-
-        # Split into manually determined bins and compute differences (steps) taken
-        # from there
-        group_labels = pd.cut(tcc, bins=[-2e-4, -1.0, -1.2, -1.6, -1.8, -1.98, 0.])
-        steps = ((tcc.shift(-2) - tcc)
-                 .groupby(group_labels)
-                 .apply(lambda s: pd.Series.reset_index(s, drop=True))
-                 .dropna())
-        groups = pd.IntervalIndex(steps.index.levels[-1])
-        shapes = infer_distributions(groups, steps, tcc,
-                                     create_plots=distribution_plots_file,
-                                     draws=8000, tune=8000)
-
-        distribution_plots_file = None
-        plot_distribution_and_hist(shapes, steps, distribution_plots_file)
-
-        (shapes.set_index(pd.MultiIndex.from_tuples(shapes.index.to_tuples()))
-               .to_csv(shape_parameters_file))
-
-    shapes = shapes.rename(columns={'nu': 'df'})
-    distributions = get_distributions_from_shapes(shapes)
+    shapes = pd.read_csv(dist_shapes_file, index_col=[0, 1])
+    shapes.index = pd.IntervalIndex.from_tuples(shapes.index)
+    return get_distributions_from_shapes(shapes)
 
 def get_cloud_cover(distributions, initial_state=1.):
     """Generator of hourly cloud cover values in [0., 1.]

@@ -36,6 +36,7 @@ setuptools.setup(
         "seaborn",
         "cdsapi"
     ],
+    setup_requires=["wheel"],
     license='MIT',
     classifiers=[
         "Programming Language :: Python :: 3",

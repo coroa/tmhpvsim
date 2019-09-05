@@ -10,13 +10,13 @@ logger = logging.getLogger(__name__)
 
 from .utils import fixedclock
 
-async def send_queue_to_amqp(meter_queue, url, exchange, routing_key, loop):
+async def send_queue_to_amqp(meter_queue, url, exchange, loop):
     """
     Connect to AMQP and continuously sent meter values from `meter_queue`
 
 
     """
-    connection = await connect_robust(url, fail_fast=False, loop=loop)
+    connection = await connect_robust(url, loop=loop)
     logger.info("Connection established")
 
     async with connection:
@@ -41,22 +41,22 @@ async def send_queue_to_amqp(meter_queue, url, exchange, routing_key, loop):
                 body=json.dumps(meter, ensure_ascii=False).encode(),
                 content_type='application/json'
             )
-            await meter_exchange.publish(message, routing_key=routing_key)
+            await meter_exchange.publish(message, routing_key="")
 
             meter_queue.task_done()
 
-def get_meter_value() -> float:
+def get_meter_value():
     """Sample a single meter value from a uniform random distribution [0, 9000]"""
     return 9000 * np.random.random()
 
-async def read_meter_values(meter_queue : asyncio.Queue):
+async def read_meter_values(meter_queue, realtime):
     """Read one meter value per second and put it into `meter_queue`
 
     See also
     --------
     get_meter_value
     """
-    async for time in fixedclock(rate=1):
+    async for time in fixedclock(rate=1, realtime=realtime):
         meter = get_meter_value()
         await meter_queue.put((time, meter))
 
@@ -65,21 +65,20 @@ async def read_meter_values(meter_queue : asyncio.Queue):
               help="AMQP URL (defaults to 'amqp://localhost:5672/')")
 @click.option('--exchange', default=os.environ.get("TMHPVSIM_EXCHANGE", 'meter'),
               help="The name of the exchange (defaults to 'meter')")
-@click.option('--routing-key', default=os.environ.get("TMHPVSIM_ROUTING_KEY", 'meter'),
-              help="The routing key")
-@click.option('--log', default=3,
-              help='logging level (1=DEBUG, 2=INFO, 3=WARN (default), 4=ERROR)')
-def metersim(amqp_url, exchange, routing_key, log):
-    logging.basicConfig(level=10 * log)
+@click.option('-v', '--verbose', count=True)
+@click.option('--realtime/--no-realtime', default=True,
+              help="Switch off rate limiting (for simulation)")
+def metersim(amqp_url, exchange, verbose, realtime):
+     # -v -> INFO, -vv -> DEBUG
+    logging.basicConfig(level=logging.WARN - 10 * verbose)
+
     loop = asyncio.get_event_loop()
     meter_queue = asyncio.Queue(loop=loop)
-    loop.create_task(read_meter_values(meter_queue))
-    loop.create_task(send_queue_to_amqp(meter_queue, amqp_url, exchange, routing_key, loop))
+    loop.create_task(read_meter_values(meter_queue, realtime))
+    loop.create_task(send_queue_to_amqp(meter_queue, amqp_url, exchange, loop))
     try:
         loop.run_forever()
     finally:
         loop.run_until_complete(loop.shutdown_asyncgens())
         if not meter_queue.empty():
             logger.warn(f"{meter_queue.qsize()} undelivered meter_values have been lost")
-
-    loop.run_until_complete(send_meter_to_amqp(amqp_url, exchange, routing_key, loop))

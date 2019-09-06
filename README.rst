@@ -15,16 +15,32 @@ Can be handled by ``pipenv`` which takes care of installing the exact same versi
     pipenv install --deploy
     pipenv shell
 
-But, instead, I would suggest to install manually with pip into a new venv:
+Instead, it is equally possible to install manually with pip into a new venv (in the subdirectory venv)
+
+.. code:: shell
+
+    git clone https://github.com/coroa/tmhpvsim.git
+    cd tmhpvsim
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+
+or use `pip` on directly on the remote repository, like
 
 .. code:: shell
 
     python3 -m venv tmhpvsim
     source tmhpvsim/bin/activate
-    pip install https://github.com/coroa/tmhpvsim.git#egg=tmhpvsim
+    pip install git+https://github.com/coroa/tmhpvsim.git#egg=tmhpvsim
 
+but then you might not be using the pinned versions I tested the application with.
 
+The installation registers two entrypoints, which are available as regular shell commands, `metersim` and `pvsim`. They are meant to be run from two separate shells or computers.
 A `RabbitMQ <https://rabbitmq.com/>`_ server -- to be used as broker -- is expected to run at ``AMQP_URL`` (defaulting to ``localhost:5672``).
+
+Both commands run according to their internal clock and produce simulated values for each second. If you supply the `--no-realtime` flag, the internal clock is not kept synchronized with local time, ie the commands run without any idle time.
+
+The commands do not produce any output by default. Use `-v` or `-vv` to see more logging messages.
 
 metersim
 --------
@@ -71,7 +87,16 @@ Usage
 
 .. note::  We might want to add a separate entrypoint or command line argument to ``pvsim`` for updating the shape parameter definition file (specifying different years, lat/lon coordinates) and/or switching to another one.
 
-Model for photo voltaic generation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The FILE receives CSV data for all times for which a simulated PV value and a meter value arrived in `pvsim` and look for example like:
 
-is described in the documentation.
+=================== ================== ================== ================== 
+time                meter              pv                 residual load      
+=================== ================== ================== ================== 
+2019-09-06 12:00:00 1374.0109643451744 165.172689783798   1208.8382745613765 
+2019-09-06 12:00:01 5779.872039952913  157.28289673499341 5622.58914321792   
+2019-09-06 12:00:02 2291.416886939385  169.98499896607225 2121.4318879733128 
+2019-09-06 12:00:03 3899.7881213287983 161.48141720257405 3738.3067041262243 
+2019-09-06 12:00:04 8399.970308135762  169.63913912237203 8230.33116901339   
+2019-09-06 12:00:05 1718.7314214700184 173.56040563731491 1545.1710158327035 
+=================== ================== ================== ================== 
+

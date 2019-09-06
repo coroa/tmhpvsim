@@ -87,7 +87,7 @@ Usage
 
 .. note::  We might want to add a separate entrypoint or command line argument to ``pvsim`` for updating the shape parameter definition file (specifying different years, lat/lon coordinates) and/or switching to another one.
 
-The FILE receives CSV data for all times for which a simulated PV value and a meter value arrived in `pvsim` and look for example like:
+The FILE receives CSV data for all times for which a simulated PV value and a meter value arrived in `pvsim`. An examplary 6 second extract looks like:
 
 =================== ================== ================== ================== 
 time                meter              pv                 residual load      
@@ -100,3 +100,8 @@ time                meter              pv                 residual load
 2019-09-06 12:00:05 1718.7314214700184 173.56040563731491 1545.1710158327035 
 =================== ================== ================== ================== 
 
+Known problems
+--------------
+While `metersim` is able to ride through a dropped connection from RabbitMQ (like a restart), `pvsim` on the other hand will swallow the Exception which signals the connection drop, due to a limitation in the underlying `aio-pika<https://aio-pika.readthedocs.io/en/latest/>` library. Refer to `aio-pika#230<https://github.com/mosquito/aio-pika/issues/230>`.
+
+In an ideal world one would rewrite both scripts using its stable backend library `aiormq<https://github.com/mosquito/aiormq>`.

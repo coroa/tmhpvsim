@@ -11,7 +11,7 @@ from collections import namedtuple
 import logging
 logger = logging.getLogger(__name__)
 
-from .utils import fixedclock, SynchronizingFunnel
+from .utils import fixedclock, SynchronizingFunnel, asyncretry, forever, asyncrun
 from .pvmodel import PVModel
 
 # Definition of the fundamental namedtuple which is synced per time-stamp
@@ -40,11 +40,12 @@ async def read_pv_values(funnel, realtime):
         time_sec = datetime.datetime(*time.timetuple()[:6])
         await funnel.put(time_sec, pv=pvmodel.next(time_sec))
 
-async def read_amqp(funnel, url, exchange, loop):
+@asyncretry(delay=5, attempts=forever)
+async def read_amqp(funnel, url, exchange):
     """Connect to AMQP and receive meter values to put into `meter_queue`
 
     """
-    connection = await aio_pika.connect_robust(url, loop=loop)
+    connection = await aio_pika.connect(url)
     logger.info("Connection established")
 
     async with connection:
@@ -68,7 +69,7 @@ async def read_amqp(funnel, url, exchange, loop):
                     time = datetime.datetime(*message.timestamp[:6])
                     await funnel.put(time, meter=meter_value)
 
-async def write_file_from_queue(filename, queue):
+async def write_file(filename, queue):
     """Receives Data tuples from `queue` and writes them to `filename` as CSV
 
     Adds timestamp and computed residual load.
@@ -80,6 +81,24 @@ async def write_file_from_queue(filename, queue):
         while True:
             time, data = await queue.get()
             writer.writerow([time] + list(data) + [data.meter - data.pv])
+            queue.task_done()
+
+async def _pvsim(file, amqp_url, exchange, realtime):
+    queue = asyncio.Queue()
+    funnel = SynchronizingFunnel(Data, queue)
+    gathered_tasks = asyncio.gather(
+        read_pv_values(funnel, realtime),
+        read_amqp(funnel, amqp_url, exchange),
+        write_file(file, queue)
+    )
+
+    try:
+        await gathered_tasks
+    finally:
+        gathered_tasks.cancel()
+
+        if len(funnel._cache) > 0:
+            logger.warn(f"{len(funnel._cache)} undelivered meter_values have been lost")
 
 @click.command()
 @click.argument('file')
@@ -92,22 +111,11 @@ async def write_file_from_queue(filename, queue):
 @click.option('--realtime/--no-realtime', default=True,
               help="Switch off rate limiting (for simulation)")
 def pvsim(file, amqp_url, exchange, verbose, realtime):
+    """
+    Entrypoint for pvsim application
+    """
+
      # -v -> INFO, -vv -> DEBUG
     logging.basicConfig(level=logging.WARN - 10 * verbose)
 
-    loop = asyncio.get_event_loop()
-
-    data_queue = asyncio.Queue(loop=loop)
-    funnel = SynchronizingFunnel(Data, data_queue)
-
-    loop.create_task(read_pv_values(funnel, realtime))
-    loop.create_task(read_amqp(funnel, amqp_url, exchange, loop))
-    loop.create_task(write_file_from_queue(file, data_queue))
-
-    try:
-        loop.run_forever()
-    finally:
-        loop.run_until_complete(loop.shutdown_asyncgens())
-        if len(funnel._cache) > 0:
-            logger.warn(f"{len(funnel._cache)} undelivered meter_values have been lost")
-            logger.debug(funnel._cache)
+    asyncrun(_pvsim(file, amqp_url, exchange, realtime))

@@ -22,7 +22,7 @@ numpy==1.17.1
 pamqp==2.3.0
 pandas==0.25.1
 patsy==0.5.1
-protobuf==3.9.1
+protobuf==3.18.3
 pvlib==0.6.3
 pymc3==3.7
 pyparsing==2.4.2
